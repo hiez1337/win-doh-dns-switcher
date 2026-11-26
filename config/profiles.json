@@ -1,0 +1,436 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-11-26",
+  "environment_notes": "Benchmarked on Windows 11 26H2. Native IPv4 DoH (TCP:443) avoids UDP/TCP:53 hijacking by local VPN TUN services and ISP DNS tampering.",
+  "deprecated_or_blocked": [
+    {
+      "ip": "127.0.0.53",
+      "provider": "Stale local DNS forwarder (127.0.0.53)",
+      "reason": "Dead listener; causes 189-991ms NRPT timeouts on cloudcode-pa and daily-cloudcode-pa"
+    },
+    {
+      "ip": "111.88.96.54",
+      "provider": "Xbox DNS",
+      "reason": "Returns 0.0.0.0 (BLOCKED) for generativelanguage.googleapis.com, gemini.google.com, and aistudio.google.com; DoT fails with SSLEOFError"
+    },
+    {
+      "ip": "111.88.96.55",
+      "provider": "Xbox DNS",
+      "reason": "Returns 0.0.0.0 (BLOCKED) for generativelanguage.googleapis.com, gemini.google.com, and aistudio.google.com"
+    },
+    {
+      "ip": "111.88.96.56",
+      "provider": "Xbox DNS",
+      "reason": "Returns 0.0.0.0 (BLOCKED) for generativelanguage.googleapis.com, gemini.google.com, and aistudio.google.com"
+    },
+    {
+      "ip": "111.88.96.57",
+      "provider": "Xbox DNS",
+      "reason": "Returns 0.0.0.0 (BLOCKED) for generativelanguage.googleapis.com, gemini.google.com, and aistudio.google.com"
+    },
+    {
+      "ip": "92.38.153.185",
+      "provider": "Comss.one DNS (legacy)",
+      "reason": "Unusable; serves expired joy-jet.com TLS certificate (expired 2026-02-13)"
+    },
+    {
+      "ip": "92.223.109.31",
+      "provider": "Comss.one DNS (legacy East)",
+      "reason": "Dead/unusable; DoH and DoT connections time out"
+    },
+    {
+      "ip": "91.230.211.67",
+      "provider": "Comss.one DNS (legacy East)",
+      "reason": "Reassigned/unusable; serves mismatched dash.hmax.name TLS certificate"
+    },
+    {
+      "ip": "83.220.169.155",
+      "provider": "Comss.one DNS / NRPT legacy",
+      "reason": "Unusable; serves self-signed for.test TLS certificate"
+    },
+    {
+      "ip": "212.109.195.93",
+      "provider": "Comss.one DNS / NRPT legacy",
+      "reason": "Dead/unusable; DoH and DoT connections time out"
+    },
+    {
+      "ip": "109.73.193.146",
+      "provider": "Comss.one DNS (retired)",
+      "reason": "Dead/unusable; DoH and DoT connections time out"
+    },
+    {
+      "ip": "93.115.24.204",
+      "provider": "Comss.one DNS (retired)",
+      "reason": "Dead/unusable; DoH and DoT connections time out"
+    },
+    {
+      "ip": "45.155.204.190",
+      "provider": "Legacy NRPT / Smart-DNS IP",
+      "reason": "Dead/unusable; times out or returns TLS EOF on TCP:443 and TCP:853"
+    },
+    {
+      "ip": "135.106.217.200",
+      "provider": "AstraCAT DNS",
+      "reason": "Dead/unusable; times out or returns TLS EOF on TCP:443 and TCP:853"
+    },
+    {
+      "ip": "144.31.151.64",
+      "provider": "AstraCAT DNS",
+      "reason": "Dead/unusable; times out or returns TLS EOF on TCP:443 and TCP:853"
+    },
+    {
+      "ip": "194.242.2.2",
+      "provider": "Mullvad DNS (retired)",
+      "reason": "Service discontinued Nov 2, 2026 (migrated users to Quad9); Schannel HTTP/0.9 failure"
+    },
+    {
+      "ip": "159.194.200.33",
+      "provider": "GeoHide Smart-DNS proxy target",
+      "reason": "Do NOT configure as a DNS resolver IP: TCP:443 DoH times out (only valid as an SNI-proxy target IP returned in A records)"
+    }
+  ],
+  "test_domains": {
+    "antigravity_core": [
+      "antigravity.google",
+      "antigravity-pa.googleapis.com",
+      "antigravity.googleapis.com",
+      "cloudcode-pa.googleapis.com",
+      "daily-cloudcode-pa.googleapis.com",
+      "autopush-cloudcode-pa.googleapis.com",
+      "antigravity-unleash.goog"
+    ],
+    "google_auth": [
+      "accounts.google.com",
+      "oauth2.googleapis.com",
+      "www.googleapis.com"
+    ],
+    "ai_inference": [
+      "generativelanguage.googleapis.com",
+      "aiplatform.googleapis.com",
+      "gemini.google.com",
+      "aistudio.google.com"
+    ],
+    "ecosystem": [
+      "open-vsx.org",
+      "edgedl.me.gvt1.com"
+    ]
+  },
+  "profiles": [
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare Unfiltered",
+      "category": "vpn-clean",
+      "recommended_for": [
+        "vpn-on"
+      ],
+      "ipv4": [
+        "1.1.1.1",
+        "1.0.0.1"
+      ],
+      "doh_template": "https://cloudflare-dns.com/dns-query",
+      "doh_ips": [
+        "1.1.1.1",
+        "1.0.0.1"
+      ],
+      "dot_host": "one.one.one.one",
+      "requires_http2": false,
+      "default_allow_udp_fallback": false,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [],
+      "trust_note": "Pure unfiltered public resolver operated by Cloudflare (APNIC). No third-party AI SNI-proxy relay. Without VPN in RF, TSPU frequently blocks/hijacks UDP:53 and applies floating DoH throttling.",
+      "notes": "Recommended #1 for VPN ON or clean DoH. Verified 16/16 CLEAN_GOOGLE. DoH H2: 615.1ms cold median / 153.5ms warm median; H1.1: 614.9ms; DoT: 603.4ms."
+    },
+    {
+      "id": "google",
+      "name": "Google Public DNS",
+      "category": "vpn-clean",
+      "recommended_for": [
+        "vpn-on"
+      ],
+      "ipv4": [
+        "8.8.8.8",
+        "8.8.4.4"
+      ],
+      "doh_template": "https://dns.google/dns-query",
+      "doh_ips": [
+        "8.8.8.8",
+        "8.8.4.4"
+      ],
+      "dot_host": "dns.google",
+      "requires_http2": false,
+      "default_allow_udp_fallback": false,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [],
+      "trust_note": "Pure unfiltered public resolver operated by Google. No third-party SNI-proxy relay. Without VPN in RF, UDP:53 and DoH/DoT are frequently disrupted by TSPU.",
+      "notes": "Recommended #2 for VPN ON or clean DoH. Verified 16/16 CLEAN_GOOGLE. DoH H2: 633.9ms cold median / 162.7ms warm median; H1.1: 618.9ms; DoT: 628.0ms."
+    },
+    {
+      "id": "controld-p0",
+      "name": "Control D Free Unfiltered (p0)",
+      "category": "vpn-clean",
+      "recommended_for": [
+        "vpn-on"
+      ],
+      "ipv4": [
+        "76.76.2.0",
+        "76.76.10.0"
+      ],
+      "doh_template": "https://freedns.controld.com/p0",
+      "doh_ips": [
+        "76.76.2.0",
+        "76.76.10.0"
+      ],
+      "dot_host": "p0.freedns.controld.com",
+      "requires_http2": false,
+      "default_allow_udp_fallback": false,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [],
+      "trust_note": "Pure no-logs resolver operated by Control D (Canada). Free tier performs NO smart-proxy or SNI relaying.",
+      "notes": "Recommended #3 for VPN ON or clean DoH (unfiltered). Verified 16/16 CLEAN_GOOGLE. DoH H2: 665.0ms cold / 160.2ms warm median; H1.1: 618.5ms; DoT: 625.4ms."
+    },
+    {
+      "id": "controld-p2",
+      "name": "Control D Free Adblock (p2)",
+      "category": "vpn-clean",
+      "recommended_for": [
+        "vpn-on"
+      ],
+      "ipv4": [
+        "76.76.2.2",
+        "76.76.10.2"
+      ],
+      "doh_template": "https://freedns.controld.com/p2",
+      "doh_ips": [
+        "76.76.2.2",
+        "76.76.10.2"
+      ],
+      "dot_host": "p2.freedns.controld.com",
+      "requires_http2": false,
+      "default_allow_udp_fallback": false,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [],
+      "trust_note": "Pure no-logs resolver with ad and tracker blocking operated by Control D (Canada). Free tier performs NO smart-proxy or SNI relaying.",
+      "notes": "Adblock variant of Control D Free for VPN ON or clean DoH. Verified 16/16 CLEAN_GOOGLE across Antigravity and Google domains. DoH H1.1: 614.9ms median; DoT: 618.3ms."
+    },
+    {
+      "id": "quad9",
+      "name": "Quad9 Secured",
+      "category": "vpn-clean",
+      "recommended_for": [
+        "vpn-on"
+      ],
+      "ipv4": [
+        "9.9.9.9",
+        "149.112.112.112"
+      ],
+      "doh_template": "https://dns.quad9.net/dns-query",
+      "doh_ips": [
+        "9.9.9.9",
+        "149.112.112.112"
+      ],
+      "dot_host": "dns.quad9.net",
+      "requires_http2": true,
+      "default_allow_udp_fallback": false,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [],
+      "trust_note": "Swiss non-profit security resolver (malware blocking + DNSSEC, no PII logging). No third-party AI SNI-proxy relay. Direct access in RF is widely blocked by TSPU without VPN.",
+      "notes": "Clean backup for VPN ON or clean DoH. REQUIRES HTTP/2 (HTTP/1.1 fails with HTTP 505; Windows 11 dnscache speaks HTTP/2). Verified 16/16 CLEAN_GOOGLE. DoH H2: 646.9ms cold / 157.2ms warm; DoT: 618.2ms."
+    },
+    {
+      "id": "adguard-unfiltered",
+      "name": "AdGuard DNS Unfiltered",
+      "category": "vpn-clean",
+      "recommended_for": [
+        "vpn-on"
+      ],
+      "ipv4": [
+        "94.140.14.140",
+        "94.140.14.141"
+      ],
+      "doh_template": "https://unfiltered.adguard-dns.com/dns-query",
+      "doh_ips": [
+        "94.140.14.140",
+        "94.140.14.141"
+      ],
+      "dot_host": "unfiltered.adguard-dns.com",
+      "requires_http2": false,
+      "default_allow_udp_fallback": false,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [],
+      "trust_note": "Pure unfiltered privacy resolver operated by AdGuard. No third-party AI SNI-proxy relay. Direct access in RF is widely blocked by TSPU without VPN.",
+      "notes": "Clean unfiltered backup for VPN ON or clean DoH. Verified 16/16 CLEAN_GOOGLE. DoH H2: 681.9ms cold / 180.8ms warm; H1.1: 660.5ms; DoT: 669.7ms."
+    },
+    {
+      "id": "dns-sb",
+      "name": "DNS.SB",
+      "category": "vpn-clean",
+      "recommended_for": [
+        "vpn-on"
+      ],
+      "ipv4": [
+        "185.222.222.222",
+        "45.11.45.11"
+      ],
+      "doh_template": "https://doh.dns.sb/dns-query",
+      "doh_ips": [
+        "185.222.222.222",
+        "45.11.45.11"
+      ],
+      "dot_host": "dot.sb",
+      "requires_http2": false,
+      "default_allow_udp_fallback": false,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [],
+      "trust_note": "Pure unfiltered privacy resolver operated by xTom GmbH. No third-party AI SNI-proxy relay. Direct DoH/DoT/53 is blocked by RF TSPU without VPN.",
+      "notes": "Clean overseas fallback for VPN ON or clean DoH. Verified 16/16 CLEAN_GOOGLE. DoH H1.1: 671.5ms median; DoT: 883.1ms."
+    },
+    {
+      "id": "geohide",
+      "name": "GeoHide Smart-DNS",
+      "category": "rf-smart",
+      "recommended_for": [
+        "vpn-off"
+      ],
+      "ipv4": [
+        "37.230.192.51",
+        "193.233.112.88"
+      ],
+      "doh_template": "https://dns.geohide.ru/dns-query",
+      "doh_ips": [
+        "37.230.192.51",
+        "193.233.112.88"
+      ],
+      "dot_host": "dns.geohide.ru",
+      "requires_http2": false,
+      "default_allow_udp_fallback": true,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [
+        "antigravity.google",
+        "antigravity-pa.googleapis.com",
+        "antigravity.googleapis.com",
+        "daily-cloudcode-pa.googleapis.com",
+        "antigravity-unleash.goog",
+        "generativelanguage.googleapis.com",
+        "gemini.google.com",
+        "aistudio.google.com"
+      ],
+      "trust_note": "Third-party Smart-DNS / SNI-proxy trust caveat: GeoHide returns proxy relay IPs (159.194.200.33, 193.233.112.67/.68/.88) for proxied AI/Antigravity domains and forwards TLS via SNI proxy. End-to-end TLS uses valid Google certificates (blocking payload MITM), but the operator observes SNI/client IP metadata and controls relay availability.",
+      "notes": "Best RF Smart-DNS for Antigravity/AI when VPN is OFF (8/16 proxied; passthrough on cloudcode-pa, autopush-cloudcode-pa, Google auth, aiplatform, open-vsx, gvt1). Do NOT add 159.194.200.33 as a DNS server (TCP:443 DoH times out). DoH H2: 75.0ms cold / 16.8ms warm; DoT: 78.1ms."
+    },
+    {
+      "id": "dns-ai",
+      "name": "DNS-AI Smart-DNS",
+      "category": "rf-smart",
+      "recommended_for": [
+        "vpn-off"
+      ],
+      "ipv4": [
+        "194.87.196.13",
+        "45.151.102.219"
+      ],
+      "doh_template": "https://dns-ai.ru/dns-query",
+      "doh_ips": [
+        "194.87.196.13",
+        "45.151.102.219"
+      ],
+      "dot_host": "dns-ai.ru",
+      "requires_http2": true,
+      "default_allow_udp_fallback": true,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [
+        "cloudcode-pa.googleapis.com",
+        "daily-cloudcode-pa.googleapis.com",
+        "generativelanguage.googleapis.com",
+        "gemini.google.com",
+        "aistudio.google.com"
+      ],
+      "trust_note": "Third-party Smart-DNS / SNI-proxy trust caveat: DNS-AI returns relay IPs (31.58.216.201, 31.31.207.68, 152.228.98.30, 193.233.112.88) for proxied domains and forwards TLS via SNI proxy. End-to-end TLS uses valid Google certificates, but the operator observes SNI/client IP metadata and controls relay availability.",
+      "notes": "RF Smart-DNS covering cloudcode-pa + daily-cloudcode-pa + generativelanguage without VPN (5/16 proxied; passes antigravity.google, antigravity-pa, antigravity.googleapis.com, and antigravity-unleash.goog unproxied). REQUIRES HTTP/2 (HTTP/1.1 returns HTTP 505). DoH H2: 113.5ms cold median; DoT TCP:853 TLS valid (*.dns-ai.ru)."
+    },
+    {
+      "id": "comss",
+      "name": "Comss.one DNS",
+      "category": "rf-smart",
+      "recommended_for": [
+        "vpn-off"
+      ],
+      "ipv4": [
+        "141.133.184.24",
+        "155.212.172.101",
+        "141.133.183.77"
+      ],
+      "doh_template": "https://dns.comss.one/dns-query",
+      "doh_ips": [
+        "141.133.184.24",
+        "155.212.172.101",
+        "141.133.183.77"
+      ],
+      "dot_host": "dns.comss.one",
+      "requires_http2": false,
+      "default_allow_udp_fallback": true,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [
+        "generativelanguage.googleapis.com",
+        "gemini.google.com",
+        "aistudio.google.com"
+      ],
+      "trust_note": "Third-party Smart-DNS / CNAME-pool and adblock trust caveat: Comss.one steers AI domains via CNAME pools (gemini-pool.comss.one, flow-pool.comss.one -> 142.251.150-157.2) and applies AdGuard/AdAway adblocking. Operator controls routing/filtering and observes query metadata.",
+      "notes": "RF adblocking DNS + GFE CNAME pool for generativelanguage, gemini, and aistudio (3/16 steered). Does NOT proxy antigravity.google, daily-cloudcode-pa, or cloudcode-pa. Refresh A records dynamically from dns.comss.one (212.109.221.20 also works; avoid dead legacy IPs 92.38.153.185, 92.223.109.31, 91.230.211.67, 83.220.169.155, 212.109.195.93). DoH H2: 77.7ms cold / 17.4ms warm; DoT: 54.9ms."
+    },
+    {
+      "id": "malw",
+      "name": "Malw Smart-DNS",
+      "category": "rf-smart",
+      "recommended_for": [
+        "vpn-off"
+      ],
+      "ipv4": [
+        "179.254.166.171",
+        "164.5.224.81"
+      ],
+      "doh_template": "https://dns.malw.link/dns-query",
+      "doh_ips": [
+        "179.254.166.171",
+        "164.5.224.81"
+      ],
+      "dot_host": "dns.malw.link",
+      "requires_http2": true,
+      "default_allow_udp_fallback": true,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [
+        "antigravity.google",
+        "daily-cloudcode-pa.googleapis.com",
+        "antigravity-unleash.goog",
+        "generativelanguage.googleapis.com",
+        "gemini.google.com",
+        "aistudio.google.com"
+      ],
+      "trust_note": "Third-party Smart-DNS / SNI-proxy trust caveat: Malw returns relay IP 48.102.233.174 (PTR 766099.senko.network) for proxied domains and forwards TLS via Nginx ssl_preread SNI proxy. End-to-end TLS uses valid Google certificates, but the operator observes SNI/client IP metadata and controls relay availability.",
+      "notes": "Smart-DNS covering 6/16 domains (passthrough on cloudcode-pa, antigravity-pa, antigravity.googleapis.com, autopush-cloudcode-pa, Google auth, aiplatform, open-vsx, gvt1). REQUIRES HTTP/2 (HTTP/1.1 fails with HTTP 505). Higher latency (~899ms DoH H2, ~896ms DoT) because IPs route via overseas path; 1 H2 reset observed mid-burst on open-vsx.org (passed 2/2 on retry)."
+    },
+    {
+      "id": "yandex",
+      "name": "Yandex.DNS Basic",
+      "category": "rf-clean",
+      "recommended_for": [
+        "vpn-off"
+      ],
+      "ipv4": [
+        "77.88.8.1",
+        "77.88.8.8"
+      ],
+      "doh_template": "https://common.dot.dns.yandex.net/dns-query",
+      "doh_ips": [
+        "77.88.8.1",
+        "77.88.8.8"
+      ],
+      "dot_host": "common.dot.dns.yandex.net",
+      "requires_http2": true,
+      "default_allow_udp_fallback": true,
+      "auto_upgrade_doh": true,
+      "smart_proxy_domains": [],
+      "trust_note": "RF-domestic resolver operated by Yandex LLC. Zero third-party AI SNI-proxy relaying, but complies with RKN blocklists and cannot bypass Google AI geo-restrictions without VPN.",
+      "notes": "High RF TSPU resilience; verified 16/16 CLEAN_GOOGLE in tests. REQUIRES HTTP/2 (HTTP/1.1 curl returns empty reply 52). Verified DoH endpoint is https://common.dot.dns.yandex.net/dns-query (resolves to 77.88.8.1/77.88.8.8 and passes HTTP/2 + TLS/SAN on both IPs; common.doh.dns.yandex.net returns NXDOMAIN in DNS despite *.doh.dns.yandex.net SAN). DoH H2: 78.9-91.3ms cold / 26.7ms warm; DoT: 79.5ms."
+    }
+  ]
+}

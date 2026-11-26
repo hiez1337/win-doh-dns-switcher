@@ -1,0 +1,21 @@
+# Runtime backups and generated state
+backups/
+
+# Python bytecode and caches
+ui/__pycache__/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs and temporary files
+*.log
+*.tmp*
+
+# Environment and IDE files
+.env
+.vscode/
+
+# OS metadata
+Thumbs.db
+.DS_Store

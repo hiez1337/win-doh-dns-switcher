@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: PowerShell AST, Encoding, Schema & Config Tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify pure ASCII encoding (.ps1, .psm1, config/*.json)
+        shell: pwsh
+        run: |
+          $files = @(
+            Get-ChildItem -Path . -Recurse -Include *.ps1, *.psm1 -File
+            Get-ChildItem -Path ./config -Filter *.json -File
+          )
+          $failed = $false
+          foreach ($file in $files) {
+            $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+            for ($i = 0; $i -lt $bytes.Length; $i++) {
+              if ($bytes[$i] -gt 127) {
+                Write-Error "Non-ASCII byte 0x$($bytes[$i].ToString('X2')) at offset $i in $($file.FullName)"
+                $failed = $true
+                break
+              }
+            }
+          }
+          if ($failed) { exit 1 }
+          Write-Host "Pure ASCII check passed for $($files.Count) file(s)."
+
+      - name: Verify PowerShell AST (pwsh 7)
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path . -Recurse -Include *.ps1, *.psm1 -File
+          $errorsTotal = 0
+          foreach ($file in $files) {
+            $tokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors -and $parseErrors.Count -gt 0) {
+              foreach ($err in $parseErrors) {
+                Write-Error "$($file.FullName):$($err.Extent.StartLineNumber): $($err.Message)"
+              }
+              $errorsTotal += $parseErrors.Count
+            }
+          }
+          if ($errorsTotal -gt 0) { exit 1 }
+          Write-Host "pwsh AST check passed (0 errors across $($files.Count) files)."
+
+      - name: Verify PowerShell AST (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          $files = Get-ChildItem -Path . -Recurse -Include *.ps1, *.psm1 -File
+          $errorsTotal = 0
+          foreach ($file in $files) {
+            $tokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors -and $parseErrors.Count -gt 0) {
+              foreach ($err in $parseErrors) {
+                Write-Error "$($file.FullName):$($err.Extent.StartLineNumber): $($err.Message)"
+              }
+              $errorsTotal += $parseErrors.Count
+            }
+          }
+          if ($errorsTotal -gt 0) { exit 1 }
+          Write-Host "Windows PowerShell 5.1 AST check passed (0 errors across $($files.Count) files)."
+
+      - name: Validate profiles.json against profiles.schema.json
+        shell: pwsh
+        run: |
+          $valid = Test-Json -Path ./config/profiles.json -SchemaFile ./config/profiles.schema.json
+          if (-not $valid) {
+            Write-Error "config/profiles.json failed schema validation."
+            exit 1
+          }
+          Write-Host "Schema validation passed."
+
+      - name: Compile Python TUI script
+        shell: pwsh
+        run: python -X utf8 -m py_compile ui/rich_ui.py
+
+      - name: Run unit-config tests (pwsh 7)
+        shell: pwsh
+        run: pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./tests/unit-config.ps1
+
+      - name: Run unit-config tests (Windows PowerShell 5.1)
+        shell: powershell
+        run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./tests/unit-config.ps1
