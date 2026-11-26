@@ -77,6 +77,7 @@ $script:ConfigPath = Join-Path $script:ProjectRoot 'config\profiles.json'
 $script:BackupDir = Join-Path $script:ProjectRoot 'backups'
 $script:RichUiScriptPath = Join-Path (Join-Path $script:ProjectRoot 'ui') 'rich_ui.py'
 $script:RichRuntimeCached = $null
+$script:ConsoleVtInitialized = $false
 $script:ExitCode = 0
 $script:IsWhatIf = [bool]$WhatIfPreference
 $WhatIfPreference = $false
@@ -171,6 +172,90 @@ function Test-ShouldUseRichUi {
     return [bool]$rt.Available
 }
 
+function Enable-ConsoleVirtualTerminal {
+    if ($script:ConsoleVtInitialized) {
+        return
+    }
+    $script:ConsoleVtInitialized = $true
+    try {
+        if ($null -eq ('DnsSwitcher.ConsoleVtHelper' -as [type])) {
+            $vtCode = @'
+using System;
+using System.Runtime.InteropServices;
+
+namespace DnsSwitcher {
+    public static class ConsoleVtHelper {
+        private const int STD_OUTPUT_HANDLE = -11;
+        private const uint ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004;
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr GetStdHandle(int nStdHandle);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
+
+        public static bool Enable() {
+            IntPtr handle = GetStdHandle(STD_OUTPUT_HANDLE);
+            if (handle == IntPtr.Zero || handle == new IntPtr(-1)) {
+                return false;
+            }
+            uint mode;
+            if (!GetConsoleMode(handle, out mode)) {
+                return false;
+            }
+            if ((mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) != 0) {
+                return true;
+            }
+            return SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+        }
+    }
+}
+'@
+            Add-Type -TypeDefinition $vtCode -ErrorAction Stop | Out-Null
+        }
+        $null = [DnsSwitcher.ConsoleVtHelper]::Enable()
+    } catch {
+        # Ignore when running without an interactive Win32 console handle.
+    }
+}
+
+function Get-ConsoleRenderWidth {
+    $width = 0
+    try {
+        if ($null -ne $Host -and $null -ne $Host.UI -and $null -ne $Host.UI.RawUI) {
+            $rawWidth = [int]$Host.UI.RawUI.WindowSize.Width
+            if ($rawWidth -gt 0) {
+                $width = $rawWidth
+            }
+        }
+    } catch {
+        $width = 0
+    }
+
+    if ($width -le 0) {
+        try {
+            $conWidth = [int][Console]::WindowWidth
+            if ($conWidth -gt 0) {
+                $width = $conWidth
+            }
+        } catch {
+            $width = 0
+        }
+    }
+
+    if ($width -le 0 -and -not [string]::IsNullOrWhiteSpace($env:COLUMNS)) {
+        $parsedWidth = 0
+        if ([int]::TryParse([string]$env:COLUMNS, [ref]$parsedWidth) -and $parsedWidth -gt 0) {
+            $width = $parsedWidth
+        }
+    }
+
+    return $width
+}
+
 function Invoke-RichUiView {
     param(
         [Parameter(Mandatory = $true)]
@@ -214,6 +299,18 @@ function Invoke-RichUiView {
         $pyArgs.Add($View)
         $pyArgs.Add('--input')
         $pyArgs.Add($tmpJsonPath)
+
+        $renderWidth = Get-ConsoleRenderWidth
+        if ($renderWidth -ge 72) {
+            $clampedWidth = [Math]::Min([Math]::Max($renderWidth, 72), 140)
+            $pyArgs.Add('--width')
+            $pyArgs.Add([string]$clampedWidth)
+        }
+
+        if (-not $NoRich.IsPresent -and [string]::IsNullOrWhiteSpace($env:NO_COLOR)) {
+            Enable-ConsoleVirtualTerminal
+            $pyArgs.Add('--force-color')
+        }
 
         & $rt.Exe @pyArgs | Out-Host
         return ($LASTEXITCODE -eq 0)
@@ -1750,6 +1847,7 @@ function Invoke-InteractiveMenu {
                 $cachedAvailability = $null
                 Write-Host ("[WARN] Live availability check failed: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
             }
+            Write-Host ''
             $needLiveCheck = $false
         }
 

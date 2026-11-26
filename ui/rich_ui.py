@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -95,13 +96,28 @@ def configure_stdio() -> None:
                 pass
 
 
-def build_console(width: int | None = None, no_color: bool = False) -> Console:
-    """Create a Rich Console configured for Windows UTF-8 output."""
+def build_console(
+    width: int | None = None,
+    no_color: bool = False,
+    force_color: bool = False,
+    color_system: str = "auto",
+) -> Console:
+    """Create a Rich Console configured for Windows UTF-8 and ANSI VT output."""
+    env_force_color = os.environ.get("FORCE_COLOR", "").strip()
+    if env_force_color and env_force_color != "0" and not no_color:
+        force_color = True
+
     kwargs: dict[str, Any] = {"highlight": False}
     if width is not None and width > 0:
         kwargs["width"] = width
     if no_color:
         kwargs["no_color"] = True
+    elif force_color:
+        kwargs["force_terminal"] = True
+        kwargs["legacy_windows"] = False
+        kwargs["color_system"] = "truecolor" if color_system == "auto" else color_system
+    elif color_system != "auto":
+        kwargs["color_system"] = color_system
     return Console(**kwargs)
 
 
@@ -181,9 +197,9 @@ def latency_style(value: Any) -> str:
     if num <= 0:
         return "dim"
     if num < 120:
-        return "green"
+        return "bold green"
     if num < 400:
-        return "cyan"
+        return "bright_cyan"
     return "yellow"
 
 
@@ -191,7 +207,7 @@ def bool_ru(value: Any, yes: str = "Да", no: str = "Нет") -> str:
     """Render bool-like value as styled Russian Да/Нет."""
     if value is None:
         return "[dim]—[/]"
-    return f"[green]{yes}[/]" if safe_bool(value) else f"[red]{no}[/]"
+    return f"[bold green]{yes}[/]" if safe_bool(value) else f"[bold red]{no}[/]"
 
 
 def join_list(value: Any, empty: str = "—") -> str:
@@ -246,11 +262,11 @@ def status_badge(avail_entry: dict[str, Any] | None) -> str:
     raw_status = safe_str(get_ci(avail_entry, "Status", "status"), default="").upper()
     available = get_ci(avail_entry, "Available", "available")
     if raw_status in ("ONLINE", "HEALTHY") or (raw_status == "" and available is True):
-        return "[green]● OK[/]"
+        return "[bold green]● OK[/]"
     if raw_status in ("DEGRADED", "PARTIAL"):
         return "[yellow]▲ Частично[/]"
     if raw_status in ("OFFLINE", "UNHEALTHY") or available is False:
-        return "[red]✕ Офлайн[/]"
+        return "[bold red]✕ Офлайн[/]"
     return "[dim]○ Не проверен[/]"
 
 
@@ -266,14 +282,14 @@ def status_latency_cell(avail_entry: dict[str, Any] | None) -> str:
 
     if raw_status in ("ONLINE", "HEALTHY") or (raw_status == "" and available is True):
         if lat_str != "—":
-            return f"[green]● OK[/] [dim]·[/] [{lat_col}]{lat_str}[/]"
-        return "[green]● OK[/]"
+            return f"[bold green]● OK[/] [dim]·[/] [{lat_col}]{lat_str}[/]"
+        return "[bold green]● OK[/]"
     if raw_status in ("DEGRADED", "PARTIAL"):
         if lat_str != "—":
             return f"[yellow]▲ Частично[/] [dim]·[/] [{lat_col}]{lat_str}[/]"
         return "[yellow]▲ Частично[/]"
     if raw_status in ("OFFLINE", "UNHEALTHY") or available is False:
-        return "[red]✕ Офлайн[/]"
+        return "[bold red]✕ Офлайн[/]"
     return "[dim]○ Не проверен[/]"
 
 
@@ -286,12 +302,12 @@ def trust_badge(profile: dict[str, Any]) -> str:
     if cat == "rf-smart":
         return "[yellow]SNI-прокси[/]"
     if cat == "rf-clean":
-        return "[cyan]РФ · Чистый[/]"
+        return "[bright_cyan]РФ · Чистый[/]"
     if pid == "controld-p2":
-        return "[green]DoH + AdBlock[/]"
+        return "[bold green]DoH + AdBlock[/]"
     if pid == "quad9":
-        return "[green]DoH + защита[/]"
-    return "[green]Чистый DoH[/]"
+        return "[bold green]DoH + защита[/]"
+    return "[bold green]Чистый DoH[/]"
 
 
 def get_vpn_state(status_report: dict[str, Any]) -> dict[str, Any]:
@@ -378,11 +394,11 @@ def format_active_dns_line(status_report: dict[str, Any]) -> Text:
     elif doh_cfg or ipv4_doh_count > 0:
         label = f"{pname} ({pid})" if pname and pid and pid != "custom" else (pname or pid or "Настроен")
         line.append("Включён ", style="bold green")
-        line.append(f"— {label} ", style="white")
-        line.append("[DoH активен]", style="green")
+        line.append(f"— {label} ", style="bold white")
+        line.append("[DoH активен]", style="bold green")
     else:
         label = f"{pname} ({pid})" if pname and pid else (pname or pid or "Статический DNS")
-        line.append("Доступен ", style="cyan")
+        line.append("Доступен ", style="bright_cyan")
         line.append(f"— {label} · ", style="white")
         line.append("DoH: Нужна настройка", style="bold yellow")
     return line
@@ -399,7 +415,7 @@ def render_header_panel(console: Console, status_report: dict[str, Any], dry_run
     is_admin = safe_bool(get_ci(status_report, "IsAdministrator"), default=False)
 
     grid = Table.grid(padding=(0, 2))
-    grid.add_column(style="bold cyan", no_wrap=True)
+    grid.add_column(style="bold bright_cyan", no_wrap=True)
     grid.add_column()
 
     vpn_text = Text()
@@ -408,7 +424,7 @@ def render_header_panel(console: Console, status_report: dict[str, Any], dry_run
         if hijack_expected:
             vpn_text.append(" · TUN может перехватывать порт 53 (DoH TCP:443 обходит)", style="dim")
     else:
-        vpn_text.append("Не активен / Не обнаружен (прямое подключение)", style="bold yellow")
+        vpn_text.append("Не активен / Не обнаружен (прямое подключение)", style="yellow")
     grid.add_row("VPN:", vpn_text)
 
     grid.add_row("DNS и DoH:", format_active_dns_line(status_report))
@@ -425,7 +441,7 @@ def render_header_panel(console: Console, status_report: dict[str, Any], dry_run
 
     priv_text = Text()
     if is_admin:
-        priv_text.append("Администратор (изменения применяются сразу)", style="green")
+        priv_text.append("Администратор (изменения применяются сразу)", style="bold green")
     else:
         priv_text.append("Обычный пользователь (UAC запросится при смене DNS)", style="dim")
     grid.add_row("Права:", priv_text)
@@ -502,7 +518,7 @@ def render_recommendations_panel(
         choice_cell = (
             f"[bold green]{medal} [{num}][/] [bold white]{pname}[/]"
             if compact
-            else f"[bold green]{medal} [{num}][/] [bold white]{pname}[/] [dim]{pid}[/]"
+            else f"[bold green]{medal} [{num}][/] [bold white]{pname}[/] [dim cyan]({pid})[/]"
         )
 
         rec_table.add_row(choice_cell, lat_display, why)
@@ -555,12 +571,12 @@ def render_profiles_table(
         expand=True,
         show_lines=False,
         padding=(0, 1),
-        header_style="bold cyan",
-        border_style="dim blue",
+        header_style="bold bright_cyan",
+        border_style="dim cyan",
     )
-    table.add_column("№", justify="right", style="bold", width=3, min_width=3, no_wrap=True)
+    table.add_column("№", justify="right", style="bold white", width=3, min_width=3, no_wrap=True)
     table.add_column("Профиль", no_wrap=True, min_width=21)
-    table.add_column("ID", style="dim", no_wrap=True, min_width=18)
+    table.add_column("ID", style="dim cyan", no_wrap=True, min_width=18)
     table.add_column("Статус", no_wrap=True, min_width=13)
     if not compact:
         table.add_column("Назначение", no_wrap=True, min_width=19)
@@ -584,9 +600,9 @@ def render_profiles_table(
 
         avail_entry = avail_map.get(pid)
         is_current = pid == active_pid and active_pid != ""
-        num_str = f"[bold cyan]★{idx}[/]" if is_current else str(idx)
-        prof_label = f"[bold cyan]{pname}[/]" if is_current else f"[bold white]{pname}[/]"
-        id_cell = f"[cyan]{pid}[/]" if is_current else pid
+        num_str = f"[bold bright_cyan]★{idx}[/]" if is_current else str(idx)
+        prof_label = f"[bold bright_cyan]{pname}[/]" if is_current else f"[bold white]{pname}[/]"
+        id_cell = f"[bright_cyan]{pid}[/]" if is_current else f"[dim cyan]{pid}[/]"
         status_cell = status_latency_cell(avail_entry)
         role = PROFILE_ROLE_RU.get(pid, safe_str(get_ci(prof, "notes"), default="Публичный DoH"))
         trust = trust_badge(prof)
@@ -609,14 +625,14 @@ def render_actions_footer(console: Console, dry_run: bool) -> None:
     cols = 2 if console.width < 80 else 3
 
     items = [
-        "[bold cyan]\\[1-12][/] Выбрать DNS",
+        "[bold bright_cyan]\\[1-12][/] Выбрать DNS",
         "[bold green]\\[C][/] Проверить доступность",
-        "[bold cyan]\\[P][/] Подробный тест",
+        "[bold bright_cyan]\\[P][/] Подробный тест",
         "[bold yellow]\\[N][/] Правила NRPT",
-        "[bold cyan]\\[R][/] Сброс / Откат",
-        "[bold cyan]\\[B][/] Резервные копии",
+        "[bold bright_cyan]\\[R][/] Сброс / Откат",
+        "[bold bright_cyan]\\[B][/] Резервные копии",
         dry_label,
-        "[bold cyan]\\[S][/] Обновить",
+        "[bold bright_cyan]\\[S][/] Обновить",
         "[bold red]\\[Q][/] Выход",
     ]
 
@@ -634,7 +650,7 @@ def render_actions_footer(console: Console, dry_run: bool) -> None:
         Panel(
             grid,
             title="[bold white]Действия[/]",
-            border_style="cyan",
+            border_style="bright_cyan",
             box=box.ROUNDED,
             padding=(0, 2),
         )
@@ -712,7 +728,7 @@ def render_status_view(console: Console, payload: dict[str, Any]) -> None:
 
     vpn_card = Panel(
         Text.from_markup("\n".join(vpn_lines)),
-        title="[bold cyan]VPN / Туннель[/]",
+        title="[bold bright_cyan]VPN / Туннель[/]",
         border_style="green" if vpn_active else "yellow",
         box=box.ROUNDED,
         padding=(0, 2),
@@ -721,14 +737,14 @@ def render_status_view(console: Console, payload: dict[str, Any]) -> None:
     nrpt_flagged = int(get_ci(nrpt, "FlaggedCount", default=0) or 0)
     nrpt_card = Panel(
         Text.from_markup(
-            f"Всего правил: [white]{safe_str(get_ci(nrpt, 'TotalRules'), '0')}[/] · "
+            f"Всего правил: [bold white]{safe_str(get_ci(nrpt, 'TotalRules'), '0')}[/] · "
             f"Конфликтных: [{'bold yellow' if nrpt_flagged > 0 else 'bold green'}]{nrpt_flagged}[/]\n"
             f"Мёртвых 127.0.0.53: [white]{safe_str(get_ci(nrpt, 'DeadLocalCount'), '0')}[/] · "
             f"Xbox DNS: [white]{safe_str(get_ci(nrpt, 'XboxDnsCount'), '0')}[/]\n"
             f"Перехват Google/Antigravity: [white]{safe_str(get_ci(nrpt, 'GoogleOverrideCount'), '0')}[/]\n"
-            f"Профиль DNS: [white]{safe_str(get_ci(guess, 'Summary'))}[/]"
+            f"Профиль DNS: [bold white]{safe_str(get_ci(guess, 'Summary'))}[/]"
         ),
-        title="[bold cyan]NRPT и текущий DNS[/]",
+        title="[bold bright_cyan]NRPT и текущий DNS[/]",
         border_style="yellow" if nrpt_flagged > 0 else "green",
         box=box.ROUNDED,
         padding=(0, 2),
@@ -753,7 +769,8 @@ def render_status_view(console: Console, payload: dict[str, Any]) -> None:
         box=box.SIMPLE_HEAD,
         expand=True,
         padding=(0, 1),
-        header_style="bold cyan",
+        header_style="bold bright_cyan",
+        border_style="dim cyan",
     )
     ad_table.add_column("Адаптер", overflow="fold")
     ad_table.add_column("Статус", no_wrap=True)
@@ -767,11 +784,11 @@ def render_status_view(console: Console, payload: dict[str, Any]) -> None:
     else:
         for ad in adapters:
             st = safe_str(get_ci(ad, "Status"))
-            st_badge = f"[green]{st}[/]" if st.lower() == "up" else f"[dim]{st}[/]"
+            st_badge = f"[bold green]{st}[/]" if st.lower() == "up" else f"[dim]{st}[/]"
             is_dhcp = safe_bool(get_ci(ad, "IsDhcpDns"), default=False)
             per_if = len(as_list(get_ci(ad, "PerInterfaceDohSettings")))
             ad_table.add_row(
-                safe_str(get_ci(ad, "Name")),
+                f"[bold white]{safe_str(get_ci(ad, 'Name'))}[/]",
                 st_badge,
                 safe_str(get_ci(ad, "InterfaceIndex")),
                 join_list(get_ci(ad, "IPv4DnsServers"), "(нет)"),
@@ -787,7 +804,8 @@ def render_status_view(console: Console, payload: dict[str, Any]) -> None:
         box=box.SIMPLE_HEAD,
         expand=True,
         padding=(0, 1),
-        header_style="bold cyan",
+        header_style="bold bright_cyan",
+        border_style="dim cyan",
     )
     doh_table.add_column("IP-адрес", no_wrap=True)
     doh_table.add_column("Шаблон DoH", overflow="fold")
@@ -798,7 +816,7 @@ def render_status_view(console: Console, payload: dict[str, Any]) -> None:
     else:
         for ds in doh_servers:
             doh_table.add_row(
-                safe_str(get_ci(ds, "ServerAddress")),
+                f"[bright_cyan]{safe_str(get_ci(ds, 'ServerAddress'))}[/]",
                 safe_str(get_ci(ds, "DohTemplate")),
                 bool_ru(get_ci(ds, "AutoUpgrade")),
                 bool_ru(get_ci(ds, "AllowFallbackToUdp"), yes="Разрешён", no="Отключён"),
@@ -809,7 +827,7 @@ def render_status_view(console: Console, payload: dict[str, Any]) -> None:
     rec_msg = (
         "Рекомендуем с включённым VPN: [bold green]cloudflare[/], [bold green]google[/] или [bold green]controld-p0[/] (чистый DoH поверх VPN)."
         if vpn_active
-        else "Рекомендуем без VPN (прямое подключение): [bold yellow]geohide[/] или [bold yellow]dns-ai[/] (умный SNI-прокси для AI), либо [bold cyan]yandex[/] (чистый РФ DNS)."
+        else "Рекомендуем без VPN (прямое подключение): [bold yellow]geohide[/] или [bold yellow]dns-ai[/] (умный SNI-прокси для AI), либо [bold bright_cyan]yandex[/] (чистый РФ DNS)."
     )
     console.print(Panel(Text.from_markup(rec_msg), title="[bold green]Совет[/]", border_style="green", box=box.ROUNDED, padding=(0, 2)))
 
@@ -827,12 +845,12 @@ def _extract_probe_results(payload: dict[str, Any]) -> tuple[dict[str, Any], lis
 def _classification_badge(cls_name: str) -> str:
     cls_u = cls_name.upper()
     if cls_u == "CLEAN_GOOGLE":
-        return "[green]Чистый Google[/]"
+        return "[bold green]Чистый Google[/]"
     if cls_u == "SMART_PROXY":
         return "[yellow]SNI-прокси[/]"
     if cls_u == "BLOCKED":
-        return "[red]Заблокирован[/]"
-    return f"[red]{cls_name or 'Ошибка'}[/]"
+        return "[bold red]Заблокирован[/]"
+    return f"[bold red]{cls_name or 'Ошибка'}[/]"
 
 
 def render_probe_view(console: Console, payload: dict[str, Any]) -> None:
@@ -844,10 +862,10 @@ def render_probe_view(console: Console, payload: dict[str, Any]) -> None:
     vpn_active = get_vpn_active(src, status_report)
 
     mode_txt = "Быстрая проверка (5 ключевых доменов)" if quick else "Полная проверка"
-    vpn_txt = "[green]VPN: ВКЛЮЧЁН[/]" if vpn_active else "[yellow]VPN: Не активен[/]"
+    vpn_txt = "[bold green]VPN: ВКЛЮЧЁН[/]" if vpn_active else "[yellow]VPN: Не активен[/]"
     console.print(
         Panel(
-            Text.from_markup(f"Режим: [bold white]{mode_txt}[/] · Область: [cyan]{scope}[/] · {vpn_txt}"),
+            Text.from_markup(f"Режим: [bold white]{mode_txt}[/] · Область: [bright_cyan]{scope}[/] · {vpn_txt}"),
             title="[bold white]Диагностика DNS (DoH + Strict TLS)[/]",
             border_style="bright_cyan",
             box=box.ROUNDED,
@@ -861,7 +879,8 @@ def render_probe_view(console: Console, payload: dict[str, Any]) -> None:
         box=box.SIMPLE_HEAD,
         expand=True,
         padding=(0, 1),
-        header_style="bold cyan",
+        header_style="bold bright_cyan",
+        border_style="dim cyan",
     )
     bench.add_column("№", justify="right", width=3, no_wrap=True)
     bench.add_column("Профиль", no_wrap=True)
@@ -882,11 +901,11 @@ def render_probe_view(console: Console, payload: dict[str, Any]) -> None:
             pname = PROFILE_SHORT_NAME_RU.get(pid.lower(), raw_name)
             st_raw = safe_str(get_ci(r, "Status"), default="").upper()
             if st_raw == "HEALTHY":
-                st_cell = "[green]● OK[/]"
+                st_cell = "[bold green]● OK[/]"
             elif st_raw == "DEGRADED":
                 st_cell = "[yellow]▲ Частично[/]"
             else:
-                st_cell = "[red]✕ Ошибка[/]"
+                st_cell = "[bold red]✕ Ошибка[/]"
 
             passed_str = safe_str(get_ci(r, "Passed"), default="")
             if not passed_str:
@@ -903,11 +922,11 @@ def render_probe_view(console: Console, payload: dict[str, Any]) -> None:
                 lat_txt = "[dim]—[/]"
 
             tls_all = get_ci(r, "TlsAllPassed")
-            tls_cell = "[green]PASS[/]" if tls_all is True else ("[red]FAIL[/]" if tls_all is False else "[dim]N/A[/]")
+            tls_cell = "[bold green]PASS[/]" if tls_all is True else ("[bold red]FAIL[/]" if tls_all is False else "[dim]N/A[/]")
 
             bench.add_row(
                 rank,
-                f"[bold white]{pname}[/] [dim]{pid}[/]",
+                f"[bold white]{pname}[/] [dim cyan]({pid})[/]",
                 st_cell,
                 passed_str,
                 safe_str(get_ci(r, "ProxiedCount"), "0"),
@@ -932,7 +951,7 @@ def render_probe_view(console: Console, payload: dict[str, Any]) -> None:
                     for d in as_list(get_ci(det, "DomainResults"))
                     if isinstance(d, dict) and safe_str(get_ci(d, "Classification"), "").upper() not in ("CLEAN_GOOGLE", "SMART_PROXY")
                 ]
-                issue_lines.append(f"• [bold]{safe_str(get_ci(iss, 'ProfileId'))}[/]: {', '.join(bad) if bad else 'ошибка TLS или таймаут'}")
+                issue_lines.append(f"• [bold white]{safe_str(get_ci(iss, 'ProfileId'))}[/]: {', '.join(bad) if bad else 'ошибка TLS или таймаут'}")
             console.print()
             console.print(Panel(Text.from_markup("\n".join(issue_lines)), title="[bold yellow]Проблемные профили[/]", border_style="yellow", box=box.ROUNDED, padding=(0, 2)))
 
@@ -945,7 +964,8 @@ def render_probe_view(console: Console, payload: dict[str, Any]) -> None:
                 box=box.SIMPLE_HEAD,
                 expand=True,
                 padding=(0, 1),
-                header_style="bold cyan",
+                header_style="bold bright_cyan",
+                border_style="dim cyan",
             )
             dt.add_column("Домен", overflow="fold")
             dt.add_column("Тип", no_wrap=True)
@@ -962,10 +982,10 @@ def render_probe_view(console: Console, payload: dict[str, Any]) -> None:
                 if cnames:
                     note += f" [dim](CNAME: {cnames})[/]"
                 if err:
-                    note += f" [red]Ошибка: {err}[/]"
+                    note += f" [bold red]Ошибка: {err}[/]"
                 rtt = get_ci(dr, "RttMs")
                 dt.add_row(
-                    safe_str(get_ci(dr, "Domain")),
+                    f"[bold white]{safe_str(get_ci(dr, 'Domain'))}[/]",
                     cls_badge,
                     f"H{safe_str(get_ci(dr, 'HttpVersion'), '?')}",
                     f"[{latency_style(rtt)}]{fmt_ms(rtt)}[/]",
@@ -981,7 +1001,8 @@ def render_probe_view(console: Console, payload: dict[str, Any]) -> None:
                 box=box.SIMPLE_HEAD,
                 expand=True,
                 padding=(0, 1),
-                header_style="bold cyan",
+                header_style="bold bright_cyan",
+                border_style="dim cyan",
             )
             tt.add_column("Домен", no_wrap=True)
             tt.add_column("IP-адрес", no_wrap=True)
@@ -992,16 +1013,16 @@ def render_probe_view(console: Console, payload: dict[str, Any]) -> None:
 
             for tr in tls_rows:
                 ok = safe_bool(get_ci(tr, "Success"), default=False)
-                st_badge = "[green]PASS[/]" if ok else "[red]FAIL[/]"
+                st_badge = "[bold green]PASS[/]" if ok else "[bold red]FAIL[/]"
                 tcp_ms = get_ci(tr, "TcpRttMs")
                 tls_ms = get_ci(tr, "TlsRttMs")
                 rtt_pair = f"{fmt_ms(tcp_ms)} / {fmt_ms(tls_ms)}"
-                info = safe_str(get_ci(tr, "CertSubject")) if ok else f"[red]{safe_str(get_ci(tr, 'Error'), 'Ошибка TLS')}[/]"
+                info = safe_str(get_ci(tr, "CertSubject")) if ok else f"[bold red]{safe_str(get_ci(tr, 'Error'), 'Ошибка TLS')}[/]"
                 failed_cnt = int(get_ci(tr, "FailedAttemptCount", default=0) or 0)
                 if ok and failed_cnt > 0:
                     info += f" [dim](резервный IP после {failed_cnt} неудач)[/]"
                 tt.add_row(
-                    safe_str(get_ci(tr, "Hostname")),
+                    f"[bold white]{safe_str(get_ci(tr, 'Hostname'))}[/]",
                     safe_str(get_ci(tr, "IpAddress")),
                     st_badge,
                     safe_str(get_ci(tr, "SslProtocol")),
@@ -1027,8 +1048,8 @@ def render_switch_view(console: Console, payload: dict[str, Any]) -> None:
     category = safe_str(get_ci(res, "Category"), default=safe_str(get_ci(prof_obj, "category"), "—"))
 
     if dry_run:
-        title_badge = "[bold cyan][ПРЕДПРОСМОТР Dry-Run][/]"
-        border = "cyan"
+        title_badge = "[bold bright_cyan][ПРЕДПРОСМОТР Dry-Run][/]"
+        border = "bright_cyan"
     elif not applied:
         title_badge = "[bold yellow][ПРОПУЩЕНО][/]"
         border = "yellow"
@@ -1040,14 +1061,14 @@ def render_switch_view(console: Console, payload: dict[str, Any]) -> None:
         border = "yellow"
 
     summary_lines = [
-        f"{title_badge} Профиль: [bold white]{pname}[/] [dim]({pid}, категория: {category})[/]",
+        f"{title_badge} Профиль: [bold white]{pname}[/] [dim cyan]({pid}, категория: {category})[/]",
         f"Режим адаптеров: [white]{safe_str(get_ci(res, 'TargetMode'))}[/] · "
         f"AutoUpgrade DoH: {bool_ru(get_ci(res, 'AutoUpgrade'))} · "
         f"UDP Fallback: {bool_ru(get_ci(res, 'AllowFallbackToUdp'), yes='Разрешён', no='Отключён')}",
     ]
     backup_path = safe_str(get_ci(res, "BackupPath"), "")
     if backup_path:
-        summary_lines.append(f"Резервная копия: [cyan]{backup_path}[/]")
+        summary_lines.append(f"Резервная копия: [bright_cyan]{backup_path}[/]")
     msg = safe_str(get_ci(res, "Message"), "")
     if msg:
         summary_lines.append(f"Сообщение: [white]{msg}[/]")
@@ -1072,11 +1093,12 @@ def render_switch_view(console: Console, payload: dict[str, Any]) -> None:
             pf_passed = safe_bool(get_ci(res, "PreflightPassed"), default=False)
             pf_rows = [p for p in as_list(get_ci(res, "PreflightResults")) if isinstance(p, dict)]
             pf_table = Table(
-                title=f"[bold white]Предпроверка DoH перед применением: {'[green]ПРОЙДЕНА[/]' if pf_passed else '[red]ОШИБКА[/]'}[/]",
+                title=f"[bold white]Предпроверка DoH перед применением: {'[bold green]ПРОЙДЕНА[/]' if pf_passed else '[bold red]ОШИБКА[/]'}[/]",
                 box=box.SIMPLE_HEAD,
                 expand=True,
                 padding=(0, 1),
-                header_style="bold cyan",
+                header_style="bold bright_cyan",
+                border_style="dim cyan",
             )
             pf_table.add_column("Домен", overflow="fold")
             pf_table.add_column("Статус", no_wrap=True)
@@ -1088,10 +1110,10 @@ def render_switch_view(console: Console, payload: dict[str, Any]) -> None:
                 err = safe_str(get_ci(pf, "Error"), "")
                 ips = join_list(get_ci(pf, "ARecords"), "(нет)")
                 if err:
-                    ips += f" [red]{err}[/]"
+                    ips += f" [bold red]{err}[/]"
                 pf_table.add_row(
-                    safe_str(get_ci(pf, "Domain")),
-                    "[green]OK[/]" if ok else "[red]FAIL[/]",
+                    f"[bold white]{safe_str(get_ci(pf, 'Domain'))}[/]",
+                    "[bold green]OK[/]" if ok else "[bold red]FAIL[/]",
                     f"HTTP {safe_str(get_ci(pf, 'HttpStatus'), '?')} (v{safe_str(get_ci(pf, 'HttpVersion'), '?')})",
                     fmt_ms(get_ci(pf, "RttMs")),
                     ips,
@@ -1103,7 +1125,7 @@ def render_switch_view(console: Console, payload: dict[str, Any]) -> None:
     if dry_run:
         target_dns = join_list(get_ci(res, "TargetIPv4Dns") or get_ci(prof_obj, "ipv4"))
         ad_rows = [a for a in as_list(get_ci(res, "TargetAdapters")) if isinstance(a, dict)]
-        ad_table = Table(title="[bold white]Планируемые изменения адаптеров[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold cyan")
+        ad_table = Table(title="[bold white]Планируемые изменения адаптеров[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold bright_cyan", border_style="dim cyan")
         ad_table.add_column("Адаптер")
         ad_table.add_column("Было (IPv4)")
         ad_table.add_column("Станет (IPv4)")
@@ -1111,7 +1133,7 @@ def render_switch_view(console: Console, payload: dict[str, Any]) -> None:
             ad_table.add_row(
                 f"{safe_str(get_ci(ta, 'Name'))} (if={safe_str(get_ci(ta, 'InterfaceIndex'))})",
                 join_list(get_ci(ta, "CurrentIPv4Dns"), "(нет)"),
-                f"[cyan]{target_dns}[/]",
+                f"[bright_cyan]{target_dns}[/]",
             )
         if ad_rows:
             console.print()
@@ -1120,7 +1142,7 @@ def render_switch_view(console: Console, payload: dict[str, Any]) -> None:
         doh_rows = [d for d in as_list(get_ci(res, "PlannedDoh")) if isinstance(d, dict)]
         if doh_rows:
             console.print()
-            dt = Table(title="[bold white]Планируемые шаблоны Windows DoH[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold cyan")
+            dt = Table(title="[bold white]Планируемые шаблоны Windows DoH[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold bright_cyan", border_style="dim cyan")
             dt.add_column("Действие", no_wrap=True)
             dt.add_column("IP-адрес", no_wrap=True)
             dt.add_column("Шаблон DoH", overflow="fold")
@@ -1131,7 +1153,7 @@ def render_switch_view(console: Console, payload: dict[str, Any]) -> None:
         planned_nrpt = as_dict(get_ci(res, "PlannedNrptCleanup"))
         if planned_nrpt:
             console.print()
-            console.print(f"[cyan]План очистки NRPT:[/] будет создано резервное сохранение и удалено правил: {safe_str(get_ci(planned_nrpt, 'TargetCount'), '0')}.")
+            console.print(f"[bright_cyan]План очистки NRPT:[/] будет создано резервное сохранение и удалено правил: {safe_str(get_ci(planned_nrpt, 'TargetCount'), '0')}.")
         elif get_ci(res, "NrptFlaggedBefore") is not None:
             console.print()
             console.print(f"[dim]Аудит NRPT: найдено конфликтных правил: {safe_str(get_ci(res, 'NrptFlaggedBefore'), '0')} (добавьте -CleanNrpt для очистки).[/]")
@@ -1139,7 +1161,7 @@ def render_switch_view(console: Console, payload: dict[str, Any]) -> None:
         ad_updates = [a for a in as_list(get_ci(res, "AdapterUpdates")) if isinstance(a, dict)]
         if ad_updates:
             console.print()
-            ad_table = Table(title="[bold white]Обновлённые адаптеры[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold cyan")
+            ad_table = Table(title="[bold white]Обновлённые адаптеры[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold bright_cyan", border_style="dim cyan")
             ad_table.add_column("Адаптер")
             ad_table.add_column("Было (IPv4)")
             ad_table.add_column("Стало (IPv4)")
@@ -1147,14 +1169,14 @@ def render_switch_view(console: Console, payload: dict[str, Any]) -> None:
                 ad_table.add_row(
                     f"{safe_str(get_ci(au, 'Name'))} (if={safe_str(get_ci(au, 'InterfaceIndex'))})",
                     join_list(get_ci(au, "PreviousDns"), "(нет)"),
-                    f"[green]{join_list(get_ci(au, 'AppliedDns'))}[/]",
+                    f"[bold green]{join_list(get_ci(au, 'AppliedDns'))}[/]",
                 )
             console.print(ad_table)
 
         doh_regs = [d for d in as_list(get_ci(res, "DohRegistrations")) if isinstance(d, dict)]
         if doh_regs:
             console.print()
-            dt = Table(title="[bold white]Регистрация Windows DoH[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold cyan")
+            dt = Table(title="[bold white]Регистрация Windows DoH[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold bright_cyan", border_style="dim cyan")
             dt.add_column("Действие", no_wrap=True)
             dt.add_column("IP-адрес", no_wrap=True)
             dt.add_column("Метод", no_wrap=True)
@@ -1174,7 +1196,7 @@ def render_switch_view(console: Console, payload: dict[str, Any]) -> None:
             target_c = int(get_ci(nrpt_res, "TargetCount", default=0) or 0)
             rem_flagged = get_ci(nrpt_res, "RemainingFlagged")
             console.print()
-            console.print(f"[cyan]Очистка NRPT:[/] удалено {removed}/{target_c}, осталось конфликтных: {safe_str(rem_flagged, '0')}.")
+            console.print(f"[bright_cyan]Очистка NRPT:[/] удалено {removed}/{target_c}, осталось конфликтных: {safe_str(rem_flagged, '0')}.")
 
         pv = as_dict(get_ci(res, "PostVerification"))
         cf = as_dict(get_ci(res, "CacheFlush"))
@@ -1212,8 +1234,8 @@ def render_reset_view(console: Console, payload: dict[str, Any]) -> None:
     target_mode = safe_str(get_ci(res, "TargetMode"))
 
     if dry_run:
-        badge = "[bold cyan][ПРЕДПРОСМОТР Dry-Run][/] План сброса DNS"
-        border = "cyan"
+        badge = "[bold bright_cyan][ПРЕДПРОСМОТР Dry-Run][/] План сброса DNS"
+        border = "bright_cyan"
     elif not applied:
         badge = f"[bold yellow][ПРОПУЩЕНО][/] {safe_str(get_ci(res, 'Message'), 'Сброс отменён.')}"
         border = "yellow"
@@ -1229,7 +1251,7 @@ def render_reset_view(console: Console, payload: dict[str, Any]) -> None:
     ]
     bpath = safe_str(get_ci(res, "BackupPath"), "")
     if bpath:
-        lines.append(f"Резервная копия: [cyan]{bpath}[/]")
+        lines.append(f"Резервная копия: [bright_cyan]{bpath}[/]")
     cf = as_dict(get_ci(res, "CacheFlush"))
     if cf:
         lines.append(f"Сброс кэша ({safe_str(get_ci(cf, 'Method'))}): [white]{safe_str(get_ci(cf, 'Message'))}[/]")
@@ -1239,7 +1261,7 @@ def render_reset_view(console: Console, payload: dict[str, Any]) -> None:
     actions = [a for a in as_list(get_ci(res, "PlannedActions" if dry_run else "Actions")) if isinstance(a, dict)]
     if actions:
         console.print()
-        at = Table(title="[bold white]Действия по адаптерам[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold cyan")
+        at = Table(title="[bold white]Действия по адаптерам[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold bright_cyan", border_style="dim cyan")
         at.add_column("Адаптер")
         at.add_column("Было (IPv4)")
         at.add_column("Станет")
@@ -1273,9 +1295,9 @@ def render_nrpt_view(console: Console, payload: dict[str, Any]) -> None:
         flagged = int(get_ci(audit, "FlaggedCount", default=0) or 0)
         clean = int(get_ci(audit, "CleanCount", default=max(0, total - flagged)) or 0)
         summary = (
-            f"Всего правил: [white]{total}[/] · "
+            f"Всего правил: [bold white]{total}[/] · "
             f"Конфликтных: [{'bold yellow' if flagged > 0 else 'bold green'}]{flagged}[/] · "
-            f"Чистых: [green]{clean}[/]\n"
+            f"Чистых: [bold green]{clean}[/]\n"
             f"127.0.0.53 (мёртвый): [white]{safe_str(get_ci(audit, 'DeadLocalCount'), '0')}[/] · "
             f"Xbox DNS: [white]{safe_str(get_ci(audit, 'XboxDnsCount'), '0')}[/] · "
             f"Перехват Google/Antigravity: [white]{safe_str(get_ci(audit, 'GoogleOverrideCount'), '0')}[/]"
@@ -1284,19 +1306,19 @@ def render_nrpt_view(console: Console, payload: dict[str, Any]) -> None:
         console.print()
 
         rules = [r for r in as_list(get_ci(audit, "Rules")) if isinstance(r, dict)]
-        rt = Table(title="[bold white]Правила NRPT[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold cyan")
+        rt = Table(title="[bold white]Правила NRPT[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold bright_cyan", border_style="dim cyan")
         rt.add_column("Статус", no_wrap=True)
         rt.add_column("Правило", overflow="fold")
         rt.add_column("Домены (Namespace)", overflow="fold")
         rt.add_column("Серверы DNS", overflow="fold")
         rt.add_column("Причина / Описание", overflow="fold")
         if not rules:
-            rt.add_row("[green]Чисто[/]", "[dim]Правила NRPT отсутствуют[/]", "—", "—", "—")
+            rt.add_row("[bold green]Чисто[/]", "[dim]Правила NRPT отсутствуют[/]", "—", "—", "—")
         else:
             for r in rules:
                 is_f = safe_bool(get_ci(r, "IsFlagged"))
                 rt.add_row(
-                    "[yellow]КОНФЛИКТ[/]" if is_f else "[green]ЧИСТО[/]",
+                    "[yellow]КОНФЛИКТ[/]" if is_f else "[bold green]ЧИСТО[/]",
                     safe_str(get_ci(r, "Name")),
                     join_list(get_ci(r, "Namespace")),
                     join_list(get_ci(r, "NameServers")),
@@ -1311,35 +1333,35 @@ def render_nrpt_view(console: Console, payload: dict[str, Any]) -> None:
     if is_restore:
         title = "[bold white]Восстановление правил NRPT[/]"
         text = (
-            f"{'[cyan][Dry-Run][/] ' if dry_run else '[green][OK][/] '}Файл: [cyan]{safe_str(get_ci(src, 'BackupPath'))}[/]\n"
+            f"{'[bold bright_cyan][Dry-Run][/] ' if dry_run else '[bold green][OK][/] '}Файл: [bright_cyan]{safe_str(get_ci(src, 'BackupPath'))}[/]\n"
             f"Правил в копии: {safe_str(get_ci(src, 'BackupRuleCount'), '0')} · "
             f"Добавлено/будет: {safe_str(get_ci(src, 'WouldAddCount' if dry_run else 'AddedCount'), '0')} · "
             f"Удалено/будет: {safe_str(get_ci(src, 'WouldRemoveCount' if dry_run else 'RemovedCount'), '0')} · "
             f"Пропущено: {safe_str(get_ci(src, 'WouldSkipCount' if dry_run else 'SkippedCount'), '0')}"
         )
-        console.print(Panel(Text.from_markup(text), title=title, border_style="cyan" if dry_run else "green", box=box.ROUNDED, padding=(0, 2)))
+        console.print(Panel(Text.from_markup(text), title=title, border_style="bright_cyan" if dry_run else "green", box=box.ROUNDED, padding=(0, 2)))
     else:
         target_cnt = int(get_ci(src, "TargetCount", default=0) or 0)
         removed_cnt = int(get_ci(src, "RemovedCount", default=0) or 0)
         rem_flagged = get_ci(src, "RemainingFlagged")
         if dry_run:
-            header = f"[cyan][Dry-Run][/] К удалению помечено правил: [bold]{target_cnt}[/] из {safe_str(get_ci(src, 'TotalRules', 'TotalBefore'), '0')}"
-            border = "cyan"
+            header = f"[bold bright_cyan][Dry-Run][/] К удалению помечено правил: [bold white]{target_cnt}[/] из {safe_str(get_ci(src, 'TotalRules', 'TotalBefore'), '0')}"
+            border = "bright_cyan"
         elif target_cnt == 0:
-            header = "[green][OK][/] Устаревших или конфликтующих правил NRPT не найдено."
+            header = "[bold green][OK][/] Устаревших или конфликтующих правил NRPT не найдено."
             border = "green"
         else:
-            header = f"[green][OK][/] Удалено правил NRPT: [bold]{removed_cnt}/{target_cnt}[/]. Осталось конфликтных: {safe_str(rem_flagged, '0')}"
+            header = f"[bold green][OK][/] Удалено правил NRPT: [bold white]{removed_cnt}/{target_cnt}[/]. Осталось конфликтных: {safe_str(rem_flagged, '0')}"
             border = "green"
         bpath = safe_str(get_ci(src, "BackupPath"), "")
         if bpath:
-            header += f"\nРезервная копия: [cyan]{bpath}[/]"
+            header += f"\nРезервная копия: [bright_cyan]{bpath}[/]"
         console.print(Panel(Text.from_markup(header), title="[bold white]Очистка правил NRPT[/]", border_style=border, box=box.ROUNDED, padding=(0, 2)))
 
         rule_list = [r for r in as_list(get_ci(src, "PlannedRules" if dry_run else "RemovedRules")) if isinstance(r, dict)]
         if rule_list:
             console.print()
-            rt = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold cyan")
+            rt = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold bright_cyan", border_style="dim cyan")
             rt.add_column("Правило", overflow="fold")
             rt.add_column("Домены", overflow="fold")
             rt.add_column("Серверы DNS", overflow="fold")
@@ -1373,7 +1395,8 @@ def render_backups_view(console: Console, payload: dict[str, Any]) -> None:
             box=box.SIMPLE_HEAD,
             expand=True,
             padding=(0, 1),
-            header_style="bold cyan",
+            header_style="bold bright_cyan",
+            border_style="dim cyan",
         )
         bt.add_column("№", justify="right", width=3, no_wrap=True)
         bt.add_column("Статус", no_wrap=True)
@@ -1390,8 +1413,8 @@ def render_backups_view(console: Console, payload: dict[str, Any]) -> None:
                 content = f"Адаптеры:{safe_str(get_ci(b, 'AdapterCount'), '0')} DoH:{safe_str(get_ci(b, 'DohServerCount'), '0')} NRPT:{safe_str(get_ci(b, 'NrptRuleCount'), '0')}"
                 bt.add_row(
                     str(idx),
-                    "[green]VALID[/]" if valid else "[red]INVALID[/]",
-                    safe_str(get_ci(b, "FileName", "FullName")),
+                    "[bold green]VALID[/]" if valid else "[bold red]INVALID[/]",
+                    f"[bold white]{safe_str(get_ci(b, 'FileName', 'FullName'))}[/]",
                     safe_str(get_ci(b, "Label")),
                     content,
                     safe_str(get_ci(b, "CreatedAt")),
@@ -1402,16 +1425,16 @@ def render_backups_view(console: Console, payload: dict[str, Any]) -> None:
     if get_ci(src, "Backup") is not None or get_ci(src, "AdapterCount") is not None:
         bobj = as_dict(get_ci(src, "Backup")) or src
         dry_run = safe_bool(get_ci(src, "DryRun"), default=safe_bool(get_ci(payload, "DryRun"), default=False))
-        prefix = "[cyan][Dry-Run][/] Будет создана копия" if dry_run else "[green][OK][/] Резервная копия сохранена"
+        prefix = "[bold bright_cyan][Dry-Run][/] Будет создана копия" if dry_run else "[bold green][OK][/] Резервная копия сохранена"
         info = (
             f"{prefix}\n"
-            f"Путь: [cyan]{safe_str(get_ci(bobj, 'BackupPath', 'BackupDir'))}[/]\n"
-            f"Метка: [white]{safe_str(get_ci(bobj, 'Label'))}[/] · "
+            f"Путь: [bright_cyan]{safe_str(get_ci(bobj, 'BackupPath', 'BackupDir'))}[/]\n"
+            f"Метка: [bold white]{safe_str(get_ci(bobj, 'Label'))}[/] · "
             f"Адаптеры: {safe_str(get_ci(bobj, 'AdapterCount'), '0')} · "
             f"DoH: {safe_str(get_ci(bobj, 'DohServerCount'), '0')} · "
             f"NRPT: {safe_str(get_ci(bobj, 'NrptRuleCount'), '0')}"
         )
-        console.print(Panel(Text.from_markup(info), title="[bold white]Создание резервной копии[/]", border_style="cyan" if dry_run else "green", box=box.ROUNDED, padding=(0, 2)))
+        console.print(Panel(Text.from_markup(info), title="[bold white]Создание резервной копии[/]", border_style="bright_cyan" if dry_run else "green", box=box.ROUNDED, padding=(0, 2)))
         return
 
     # Restore result
@@ -1419,20 +1442,20 @@ def render_backups_view(console: Console, payload: dict[str, Any]) -> None:
     executed = safe_bool(get_ci(src, "Executed"), default=False)
     bpath = safe_str(get_ci(src, "BackupPath"))
     if dry_run:
-        head = f"[cyan][Dry-Run][/] Предпросмотр восстановления из: [cyan]{bpath}[/]"
-        border = "cyan"
+        head = f"[bold bright_cyan][Dry-Run][/] Предпросмотр восстановления из: [bright_cyan]{bpath}[/]"
+        border = "bright_cyan"
     elif executed:
-        head = f"[green][OK][/] Состояние DNS восстановлено из: [cyan]{bpath}[/]"
+        head = f"[bold green][OK][/] Состояние DNS восстановлено из: [bright_cyan]{bpath}[/]"
         border = "green"
     else:
-        head = f"[yellow][ПРЕДУПРЕЖДЕНИЕ][/] Восстановление из [cyan]{bpath}[/] завершилось с ошибками"
+        head = f"[bold yellow][ПРЕДУПРЕЖДЕНИЕ][/] Восстановление из [bright_cyan]{bpath}[/] завершилось с ошибками"
         border = "yellow"
     console.print(Panel(Text.from_markup(head), title="[bold white]Восстановление из резервной копии[/]", border_style=border, box=box.ROUNDED, padding=(0, 2)))
 
     ad_list = [a for a in as_list(get_ci(src, "AdapterActions" if dry_run else "AdapterResults")) if isinstance(a, dict)]
     if ad_list:
         console.print()
-        at = Table(title="[bold white]Адаптеры[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold cyan")
+        at = Table(title="[bold white]Адаптеры[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold bright_cyan", border_style="dim cyan")
         at.add_column("Адаптер")
         at.add_column("Действие")
         at.add_column("DNS (IPv4)")
@@ -1467,8 +1490,15 @@ def render_help_view(console: Console, payload: dict[str, Any]) -> None:
     )
     console.print()
 
-    cmd_table = Table(title="[bold white]Команды CLI[/]", box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), header_style="bold cyan")
-    cmd_table.add_column("Команда", style="bold white", overflow="fold")
+    cmd_table = Table(
+        title="[bold white]Команды CLI[/]",
+        box=box.SIMPLE_HEAD,
+        expand=True,
+        padding=(0, 1),
+        header_style="bold bright_cyan",
+        border_style="dim cyan",
+    )
+    cmd_table.add_column("Команда", style="bold bright_cyan", overflow="fold")
     cmd_table.add_column("Описание", overflow="fold")
     commands = [
         ("dns-switch.ps1", "Запустить интерактивное меню с живой проверкой"),
@@ -1517,13 +1547,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--input", dest="input_path", default=None, help="Optional path to UTF-8 JSON payload.")
     parser.add_argument("--width", type=int, default=None, help="Optional console width override.")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors.")
+    parser.add_argument(
+        "--force-color",
+        action="store_true",
+        help="Force ANSI color output even when stdout is piped (e.g. Out-Host).",
+    )
+    parser.add_argument(
+        "--color-system",
+        choices=["auto", "standard", "256", "truecolor"],
+        default="auto",
+        help="Rich color system to use when rendering ANSI output.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     configure_stdio()
     args = parse_args(argv)
-    console = build_console(width=args.width, no_color=args.no_color)
+    console = build_console(
+        width=args.width,
+        no_color=args.no_color,
+        force_color=args.force_color,
+        color_system=args.color_system,
+    )
     try:
         payload = load_payload(args.input_path)
     except Exception as exc:
