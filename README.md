@@ -1,7 +1,8 @@
-**English** | [Русский](README.ru.md)
+**English** | [Русский](README.ru.md) · [Releases](https://github.com/hiez1337/win-doh-dns-switcher/releases)
 
 # Windows 11 DNS & Native DoH Switcher (`dns_switcher`)
 
+[![GitHub Release](https://img.shields.io/github/v/release/hiez1337/win-doh-dns-switcher)](https://github.com/hiez1337/win-doh-dns-switcher/releases/latest)
 [![Platform: Windows 11](https://img.shields.io/badge/Platform-Windows%2011-0078D4?logo=windows11&logoColor=white)](https://www.microsoft.com/windows/windows-11)
 [![PowerShell: 5.1 & 7+](https://img.shields.io/badge/PowerShell-5.1%20%26%207%2B-5391FE?logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
 [![UI: Python Rich TUI](https://img.shields.io/badge/UI-Python%20Rich%20TUI-3776AB?logo=python&logoColor=white)](ui/rich_ui.py)
@@ -81,7 +82,7 @@ Pure public resolvers without third-party AI SNI-proxy relays. Recommended when 
 
 - **OS**: Windows 11 (native IPv4 DoH support).
 - **Shell**: Windows PowerShell 5.1 (built-in) or PowerShell 7+ (`pwsh.exe`).
-- **Optional Rich TUI**: Python 3 with the `rich` package (`pip install rich`). If Python or `rich` is unavailable, or `-NoRich` is passed, `dns_switcher` seamlessly falls back to clean native PowerShell console output.
+- **Optional Rich TUI**: Python 3 with the `rich` package (`pip install rich`). Automatically enables Win32 Virtual Terminal processing (`ENABLE_VIRTUAL_TERMINAL_PROCESSING`) and `--force-color` so full ANSI colors render cleanly in Windows Terminal and `conhost.exe` on both PowerShell 5.1 and 7+. Disable colors via `NO_COLOR=1`, or pass `-NoRich` (or omit `rich`) to fall back to clean native PowerShell console output.
 
 ### Launch
 
@@ -105,8 +106,9 @@ When launched without arguments, `.\dns-switch.ps1` opens the interactive dashbo
 
 1. **Automatic Live Availability Check**: On startup, runs `Get-LiveDnsAvailability` in parallel across all 12 profiles against `cloudcode-pa.googleapis.com`, `daily-cloudcode-pa.googleapis.com`, and `antigravity.google` (3 s timeout, cached for the menu session).
 2. **"Recommended Right Now" Panel**: Displays the top 3 reachable profiles tailored to your current VPN status (live `RecommendedIds` with latency in ms, falling back to static recommendations if offline).
-3. **All 12 Profiles Table**: Shows live status (`Working` / `Partial` / `Unavailable` / `Not checked`), latency, intended use, HTTP/2 requirement, and trust badge (`Clean DoH` vs `Third-party SNI-proxy`), adapting automatically to narrow consoles (`< 100` columns).
-4. **Menu Hotkeys**:
+3. **All 12 Profiles Table (Single-Line Layout)**: Uses a minimal horizontal-rule table (`box.SIMPLE_HEAD`) with a `Without VPN (RF)` (`── Без VPN (РФ) ──`) group divider between `vpn-clean` and `rf-smart`/`rf-clean`, a combined **Status** cell (`● OK · 56 мс`, `▲ Частично · 95 мс`, `✕ Офлайн`, `○ Не проверен`), role summary, and trust badge (`Чистый DoH`, `DoH + защита`, `DoH + AdBlock`, `SNI-прокси`, `CNAME/AdBlock`, `РФ · Чистый`).
+4. **Responsive Terminal Width & Preserved ANSI Colors**: Automatically reads the host console width (`72..140` columns) and adapts cleanly — hiding the role column and recommendation `({id})` tags below `95` columns, stacking top `status` cards below `100` columns, and collapsing the aligned 3×3 action grid into 2 columns below `80` columns. Win32 VT processing (`ENABLE_VIRTUAL_TERMINAL_PROCESSING`) and `--force-color` preserve ANSI colors across PowerShell pipes in Windows Terminal and `conhost.exe` (disable with `-NoRich` or `NO_COLOR=1`).
+5. **Aligned 3×3 Menu Shortcuts**:
    - `1–12` — Select and apply a DNS profile + Windows 11 native IPv4 DoH.
    - `[C]` — Re-run live parallel availability check across all 12 profiles.
    - `[P]` — Detailed `probe` diagnostics with strict TLS certificate validation.
@@ -197,19 +199,19 @@ dns_switcher/
 │   ├── DnsProbe.psm1              # Live DoH probing, strict TLS checks, parallel availability matrix
 │   └── DnsSwitcher.psm1           # Adapter targeting, Windows 11 DoH registration, switch & reset
 ├── ui/
-│   └── rich_ui.py                 # Optional Python Rich TUI renderer (8 --view modes, auto-fallback)
+│   └── rich_ui.py                 # Optional Python Rich TUI (8 --view modes, --width, --force-color, --color-system, --no-color)
 ├── backups/                       # Local JSON state snapshots (created at runtime, gitignored)
 └── tests/
     ├── run-tests.ps1              # Unified test runner (all | unit | integration)
     ├── TestHarness.ps1            # Shared test assertions & process helpers
-    ├── unit-config.ps1            # Config & JSON schema unit tests
-    ├── unit-lib.ps1               # Module unit tests for lib\*.psm1
-    └── integration-cli.ps1        # Read-only & DryRun CLI integration tests
+    ├── unit-config.ps1            # Config & JSON schema unit tests (9 tests)
+    ├── unit-lib.ps1               # Module unit tests for lib\*.psm1 (20 tests)
+    └── integration-cli.ps1        # Read-only & DryRun CLI integration tests (33 tests)
 ```
 
 ### Running Tests
 
-Run the full test suite on either PowerShell 7+ (`pwsh`) or Windows PowerShell 5.1 (`powershell`):
+Run the full 62-test suite (`9` config + `20` lib + `33` CLI integration) on either PowerShell 7+ (`pwsh`) or Windows PowerShell 5.1 (`powershell`):
 
 ```powershell
 .\tests\run-tests.ps1
@@ -219,6 +221,16 @@ Run the full test suite on either PowerShell 7+ (`pwsh`) or Windows PowerShell 5
 ```
 
 GitHub Actions CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) automatically verifies pure-ASCII encoding on `.ps1`/`.psm1`/`config/*.json`, PowerShell AST parsing on both `pwsh` 7 and `powershell` 5.1, JSON Schema validation, `python -X utf8 -m py_compile ui/rich_ui.py`, and `.\tests\unit-config.ps1`.
+
+---
+
+## Changelog
+
+- **v1.0.1** — Decluttered Rich TUI layout & preserved terminal colors/width:
+  - Redesigned `ui/rich_ui.py` into single-line rows across all 12 profiles with combined status + latency, `Without VPN (RF)` (`── Без VPN (РФ) ──`) group divider, aligned 3×3 action grid, and responsive `< 95` / `< 80` / `< 100` width breakpoints.
+  - Added `--force-color`, `--color-system`, `FORCE_COLOR` support, `72..140` column width clamping, and Win32 `ENABLE_VIRTUAL_TERMINAL_PROCESSING` (`Enable-ConsoleVirtualTerminal`) in `dns-switch.ps1` so ANSI colors render cleanly across Windows Terminal, `conhost.exe`, PowerShell 5.1, and PowerShell 7+.
+- **v1.0.0** — Initial release:
+  - Windows 11 native IPv4 DoH switcher (`dns-switch.ps1` / `dns-switch.cmd`), 12 curated profiles (`vpn-clean`, `rf-smart`, `rf-clean`), universal VPN/TUN/RAS detection, parallel live checks, strict TLS `probe`, NRPT audit/cleanup, atomic JSON backups, auto-UAC log/JSON relay, optional Rich TUI, and 62 dual-runtime tests.
 
 ---
 

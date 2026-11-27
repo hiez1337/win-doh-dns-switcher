@@ -1,7 +1,8 @@
-[English](README.md) | **Русский**
+[English](README.md) | **Русский** · [Релизы](https://github.com/hiez1337/win-doh-dns-switcher/releases)
 
 # Мастер DNS и нативного DoH для Windows 11 (`dns_switcher`)
 
+[![GitHub Release](https://img.shields.io/github/v/release/hiez1337/win-doh-dns-switcher)](https://github.com/hiez1337/win-doh-dns-switcher/releases/latest)
 [![Platform: Windows 11](https://img.shields.io/badge/Platform-Windows%2011-0078D4?logo=windows11&logoColor=white)](https://www.microsoft.com/windows/windows-11)
 [![PowerShell: 5.1 & 7+](https://img.shields.io/badge/PowerShell-5.1%20%26%207%2B-5391FE?logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
 [![UI: Python Rich TUI](https://img.shields.io/badge/UI-Python%20Rich%20TUI-3776AB?logo=python&logoColor=white)](ui/rich_ui.py)
@@ -81,7 +82,7 @@
 
 - **ОС**: Windows 11 (нативная поддержка IPv4 DoH).
 - **Оболочка**: встроенный Windows PowerShell 5.1 или PowerShell 7+ (`pwsh.exe`).
-- **Опциональный Rich TUI**: Python 3 с библиотекой `rich` (`pip install rich`). Если Python или `rich` не установлены, либо передан флаг `-NoRich`, скрипт автоматически переключается на чистый текстовый вывод PowerShell.
+- **Опциональный Rich TUI**: Python 3 с библиотекой `rich` (`pip install rich`). Автоматически включает обработку VT-последовательностей (`ENABLE_VIRTUAL_TERMINAL_PROCESSING`) и флаг `--force-color`, сохраняя полноцветный вывод в Windows Terminal и `conhost.exe` на PowerShell 5.1 и 7+. Отключить цвета можно переменной `NO_COLOR=1`, а флагом `-NoRich` (или без установленного `rich`) скрипт переключается на чистый текстовый вывод PowerShell.
 
 ### Запуск
 
@@ -105,8 +106,9 @@
 
 1. **Автоматическая живая проверка при старте**: При открытии меню запускается `Get-LiveDnsAvailability` — параллельная проверка всех 12 профилей по доменам `cloudcode-pa.googleapis.com`, `daily-cloudcode-pa.googleapis.com` и `antigravity.google` (таймаут 3 с; результат кэшируется на время сеанса).
 2. **Панель «Рекомендуем прямо сейчас»**: Показывает топ-3 доступных профиля для текущего состояния VPN (по живым замерам `RecommendedIds` с задержкой в мс либо по статическому резерву при отсутствии сети).
-3. **Таблица всех 12 профилей DNS**: Отображает живой статус (`Работает` / `Частично` / `Недоступен` / `Не проверен`), задержку, назначение, требование HTTP/2 и уровень доверия (`Чистый DoH` vs `SNI-прокси (сторонний)`), автоматически адаптируясь к узким терминалам (`< 100` столбцов).
-4. **Горячие клавиши меню**:
+3. **Однострочная таблица всех 12 профилей DNS**: Использует облегчённую сетку без лишних рамок (`box.SIMPLE_HEAD`) с разделителем групп `── Без VPN (РФ) ──` между `vpn-clean` и `rf-smart`/`rf-clean`, объединённый столбец **Статус** (`● OK · 56 мс`, `▲ Частично · 95 мс`, `✕ Офлайн`, `○ Не проверен`), краткое назначение и бейдж доверия (`Чистый DoH`, `DoH + защита`, `DoH + AdBlock`, `SNI-прокси`, `CNAME/AdBlock`, `РФ · Чистый`).
+4. **Адаптивная ширина и сохранение ANSI-цветов**: Автоматически считывает ширину консоли (`72..140` столбцов) — при ширине `< 95` скрывает столбец «Назначение» и теги `({id})` в рекомендациях, при `< 100` перестраивает верхние карточки `status` друг под другом, а выровненную сетку действий 3×3 при `< 80` переводит в 2 столбца. Включение `ENABLE_VIRTUAL_TERMINAL_PROCESSING` и `--force-color` сохраняет цвета даже через пайп PowerShell в Windows Terminal и `conhost.exe` (отключается через `-NoRich` или `NO_COLOR=1`).
+5. **Выровненная сетка действий 3×3**:
    - `1–12` — выбрать и применить профиль DNS + нативный IPv4 DoH Windows 11.
    - `[C]` — повторить живую параллельную проверку доступности всех 12 профилей.
    - `[P]` — подробная диагностика (`probe`) со строгой проверкой сертификатов TLS.
@@ -197,19 +199,19 @@ dns_switcher/
 │   ├── DnsProbe.psm1              # Живой DoH-пробинг, строгий TLS-чек, параллельная проверка
 │   └── DnsSwitcher.psm1           # Выбор адаптеров, регистрация DoH Windows 11, switch и reset
 ├── ui/
-│   └── rich_ui.py                 # Опциональный Python Rich TUI рендерер (8 режимов --view, авто-fallback)
+│   └── rich_ui.py                 # Опциональный Rich TUI рендерер (8 режимов --view, --width, --force-color, --color-system, --no-color)
 ├── backups/                       # Локальные JSON-снимки состояния (создаются при работе, в gitignore)
 └── tests/
     ├── run-tests.ps1              # Единый раннер тестов (all | unit | integration)
     ├── TestHarness.ps1            # Общий каркас ассертов и запуска процессов
-    ├── unit-config.ps1            # Юнит-тесты конфигурации и JSON-схемы
-    ├── unit-lib.ps1               # Юнит-тесты модулей lib\*.psm1
-    └── integration-cli.ps1        # Интеграционные read-only/DryRun тесты CLI
+    ├── unit-config.ps1            # Юнит-тесты конфигурации и JSON-схемы (9 тестов)
+    ├── unit-lib.ps1               # Юнит-тесты модулей lib\*.psm1 (20 тестов)
+    └── integration-cli.ps1        # Интеграционные read-only/DryRun тесты CLI (33 теста)
 ```
 
 ### Запуск тестов
 
-Запустить весь набор тестов можно как в PowerShell 7+ (`pwsh`), так и в Windows PowerShell 5.1 (`powershell`):
+Запустить полный набор из 62 тестов (`9` config + `20` lib + `33` CLI-интеграция) можно как в PowerShell 7+ (`pwsh`), так и в Windows PowerShell 5.1 (`powershell`):
 
 ```powershell
 .\tests\run-tests.ps1
@@ -219,6 +221,16 @@ dns_switcher/
 ```
 
 Конвейер GitHub Actions CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) автоматически проверяет чистую ASCII-кодировку (`.ps1`, `.psm1`, `config/*.json`), отсутствие ошибок AST в `pwsh` 7 и `powershell` 5.1, валидацию JSON Schema, `python -X utf8 -m py_compile ui/rich_ui.py` и выполнение `.\tests\unit-config.ps1`.
+
+---
+
+## История версий
+
+- **v1.0.1** — Разгруженный макет Rich TUI и сохранение ANSI-цветов и ширины консоли:
+  - В `ui/rich_ui.py` переработана таблица 12 профилей в компактный однострочный вид с объединённым статусом/задержкой, разделителем `── Без VPN (РФ) ──`, выровненной сеткой действий 3×3 и адаптацией под ширину (`< 95`, `< 80`, `< 100` столбцов).
+  - Добавлены `--force-color`, `--color-system`, поддержка `FORCE_COLOR`, ограничение ширины `72..140` столбцов и включение Win32 VT (`ENABLE_VIRTUAL_TERMINAL_PROCESSING` через `Enable-ConsoleVirtualTerminal`) в `dns-switch.ps1` для корректного цветного вывода в Windows Terminal и `conhost.exe` на PowerShell 5.1 и 7+.
+- **v1.0.0** — Первый релиз:
+  - Нативный переключатель IPv4 DoH для Windows 11 (`dns-switch.ps1` / `dns-switch.cmd`), 12 проверенных профилей (`vpn-clean`, `rf-smart`, `rf-clean`), универсальный детект VPN/TUN/RAS, параллельная живая проверка, строгий TLS `probe`, аудит/очистка NRPT, атомарные JSON-бэкапы, авто-UAC с ретрансляцией лога/JSON, опциональный Rich TUI и 62 теста под PS 5.1 и 7+.
 
 ---
 
